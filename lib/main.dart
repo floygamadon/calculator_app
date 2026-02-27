@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const CalculatorApp());
 
-/// Root app widget.
-/// Keeps it simple: one screen showing the calculator UI.
+/// one screen showing the calculator UI.
 class CalculatorApp extends StatelessWidget {
   const CalculatorApp({super.key});
 
@@ -17,8 +16,7 @@ class CalculatorApp extends StatelessWidget {
   }
 }
 
-/// CalculatorUI is Stateful only because later you’ll change the display
-/// when buttons are pressed. For now, it’s UI-only.
+/// CalculatorUI is Stateful because display changes when buttons are pressed.
 class CalculatorUI extends StatefulWidget {
   const CalculatorUI({super.key});
 
@@ -28,31 +26,77 @@ class CalculatorUI extends StatefulWidget {
 
 class _CalculatorUIState extends State<CalculatorUI> {
   /// Display text shown at the top of the calculator.
-  /// (Static for now—UI only.)
-  String displayText = "123";
+  String displayText = "0";
 
-  // --- Colors to match the look in your screenshot ---
-  final Color _appBg = const Color(0xFFEFEFEF); // light page background
-  final Color _panelBg = const Color(0xFF101319); // dark calculator body
-  final Color _displayBg = const Color(0xFF1A1F28); // darker display pill
-  final Color _numBtn = const Color(0xFF2A2F3A); // number button gray
-  final Color _opBtn = Colors.orange; // orange operator buttons
-  final Color _textLight = const Color(0xFFEDEDED); // white-ish text
-  final Color _displayGreen = const Color(0xFF7CFF6B); // green display text
+  // --- Colors ---
+  final Color _appBg = const Color(0xFFEFEFEF);
+  final Color _panelBg = const Color(0xFF101319);
+  final Color _displayBg = const Color(0xFF1A1F28);
+  final Color _numBtn = const Color(0xFF2A2F3A);
+  final Color _opBtn = Colors.orange;
+  final Color _textLight = const Color(0xFFEDEDED);
+  final Color _displayGreen = const Color(0xFF7CFF6B);
 
-  /// Reusable button widget builder for consistent styling.
-  ///
-  /// 
-  /// - Expanded to auto-fill each "cell" in the row
-  /// - fixed height for a uniform grid
-  /// - rounded corners similar to the screenshot
-  /// - spacing via Padding
+  // ==========================
+  // INPUT HANDLERS
+  // ==========================
+
+  void _tapDigit(String digit) {
+    setState(() {
+      if (displayText == "0") {
+        displayText = digit;
+      } else {
+        displayText += digit;
+      }
+    });
+  }
+
+  void _tapDecimal() {
+    setState(() {
+      if (!displayText.contains(".")) {
+        displayText += ".";
+      }
+    });
+  }
+
+  void _clear() {
+    setState(() {
+      displayText = "0";
+    });
+  }
+
+  void _toggleSign() {
+    setState(() {
+      if (displayText == "0") return;
+      if (displayText.startsWith("-")) {
+        displayText = displayText.substring(1);
+        if (displayText.isEmpty) displayText = "0";
+      } else {
+        displayText = "-$displayText";
+      }
+    });
+  }
+
+  void _percent() {
+    setState(() {
+      final value = double.tryParse(displayText);
+      if (value == null) return;
+      final result = value / 100.0;
+      final s = result.toString();
+      displayText = s.endsWith(".0") ? s.substring(0, s.length - 2) : s;
+    });
+  }
+
+  // ==========================
+  // BUTTON BUILDER
+  // ==========================
+
   Widget _calcButton({
     required String label,
     required Color background,
     required Color foreground,
     VoidCallback? onPressed,
-    int flex = 1, // makes "0" wider when flex=2
+    int flex = 1,
   }) {
     return Expanded(
       flex: flex,
@@ -61,77 +105,45 @@ class _CalculatorUIState extends State<CalculatorUI> {
         child: SizedBox(
           height: 70,
           child: ElevatedButton(
-            // UI only: allow passing a callback later; for now, do nothing
             onPressed: onPressed ?? () {},
             style: ElevatedButton.styleFrom(
               backgroundColor: background,
               foregroundColor: foreground,
-              elevation: 0, // flat modern look like the screenshot
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: Text(label, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
           ),
         ),
       ),
     );
   }
 
-  /// Helper to build each row (4-column rows, except last row).
-  ///
-  /// Using a method keeps the build() clean and readable.
   Widget _row(List<Widget> children) {
-    return Row(
-      children: children,
-    );
+    return Row(children: children);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _appBg,
-
-      // Center the calculator "device" on the page like the picture
       body: Center(
         child: Container(
           width: 360,
           padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: _panelBg,
-            borderRadius: BorderRadius.circular(28),
-          ),
+          decoration: BoxDecoration(color: _panelBg, borderRadius: BorderRadius.circular(28)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ======================
-              // DISPLAY AREA (Top)
-              // ======================
+
+              // Display
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
-                decoration: BoxDecoration(
-                  color: _displayBg,
-                  borderRadius: BorderRadius.circular(22),
-                ),
+                decoration: BoxDecoration(color: _displayBg, borderRadius: BorderRadius.circular(22)),
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: Text(
-                    displayText,
-                    // Big, right-aligned, green-ish text like the screenshot
-                    style: TextStyle(
-                      fontSize: 44,
-                      fontWeight: FontWeight.w800,
-                      color: _displayGreen,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
+                  child: Text(displayText, style: TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: _displayGreen, letterSpacing: 1.0)),
                 ),
               ),
 
@@ -139,45 +151,40 @@ class _CalculatorUIState extends State<CalculatorUI> {
 
               // Row 1
               _row([
-                _calcButton(label: "C", background: _opBtn, foreground: _textLight),
-                _calcButton(label: "±", background: _opBtn, foreground: _textLight),
-                _calcButton(label: "%", background: _opBtn, foreground: _textLight),
+                _calcButton(label: "C", background: _opBtn, foreground: _textLight, onPressed: _clear),
+                _calcButton(label: "±", background: _opBtn, foreground: _textLight, onPressed: _toggleSign),
+                _calcButton(label: "%", background: _opBtn, foreground: _textLight, onPressed: _percent),
                 _calcButton(label: "÷", background: _opBtn, foreground: _textLight),
               ]),
 
               // Row 2
               _row([
-                _calcButton(label: "7", background: _numBtn, foreground: _textLight),
-                _calcButton(label: "8", background: _numBtn, foreground: _textLight),
-                _calcButton(label: "9", background: _numBtn, foreground: _textLight),
+                _calcButton(label: "7", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("7")),
+                _calcButton(label: "8", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("8")),
+                _calcButton(label: "9", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("9")),
                 _calcButton(label: "×", background: _opBtn, foreground: _textLight),
               ]),
 
               // Row 3
               _row([
-                _calcButton(label: "4", background: _numBtn, foreground: _textLight),
-                _calcButton(label: "5", background: _numBtn, foreground: _textLight),
-                _calcButton(label: "6", background: _numBtn, foreground: _textLight),
+                _calcButton(label: "4", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("4")),
+                _calcButton(label: "5", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("5")),
+                _calcButton(label: "6", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("6")),
                 _calcButton(label: "−", background: _opBtn, foreground: _textLight),
               ]),
 
               // Row 4
               _row([
-                _calcButton(label: "1", background: _numBtn, foreground: _textLight),
-                _calcButton(label: "2", background: _numBtn, foreground: _textLight),
-                _calcButton(label: "3", background: _numBtn, foreground: _textLight),
+                _calcButton(label: "1", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("1")),
+                _calcButton(label: "2", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("2")),
+                _calcButton(label: "3", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("3")),
                 _calcButton(label: "+", background: _opBtn, foreground: _textLight),
               ]),
 
-              // Row 5 (0 is wide)
+              // Row 5
               _row([
-                _calcButton(
-                  label: "0",
-                  background: _numBtn,
-                  foreground: _textLight,
-                  flex: 2, // makes the 0 button double-width (like the screenshot)
-                ),
-                _calcButton(label: ".", background: _numBtn, foreground: _textLight),
+                _calcButton(label: "0", background: _numBtn, foreground: _textLight, flex: 2, onPressed: () => _tapDigit("0")),
+                _calcButton(label: ".", background: _numBtn, foreground: _textLight, onPressed: _tapDecimal),
                 _calcButton(label: "=", background: _opBtn, foreground: _textLight),
               ]),
             ],

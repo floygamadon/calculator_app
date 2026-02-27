@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const CalculatorApp());
 
-/// one screen showing the calculator UI.
+// Main app wrapper.
+// - MaterialApp provides theming, navigation, and app-level config.
+// - CalculatorUI is our single screen.
 class CalculatorApp extends StatelessWidget {
   const CalculatorApp({super.key});
 
@@ -16,8 +18,8 @@ class CalculatorApp extends StatelessWidget {
   }
 }
 
-// CalculatorUI is Stateful only because later I'll change the display
-// when buttons are pressed. For now, it’s UI-only.
+// CalculatorUI is Stateful because the display and stored operands/operators
+// change as the user taps buttons.
 class CalculatorUI extends StatefulWidget {
   const CalculatorUI({super.key});
 
@@ -26,39 +28,41 @@ class CalculatorUI extends StatefulWidget {
 }
 
 class _CalculatorUIState extends State<CalculatorUI> {
-  /// Display text shown at the top of the calculator.
+  // Text shown in the display area at the top.
+  // It should be kept as a String because the user builds the number character-by-character.
   String displayText = "0";
 
-  // --- Colors to match the look in your screenshot ---
-  final Color _appBg = const Color(0xFFEFEFEF); // light page background
-  final Color _panelBg = const Color(0xFF101319); // dark calculator body
-  final Color _displayBg = const Color(0xFF1A1F28); // darker display pill
-  final Color _numBtn = const Color(0xFF2A2F3A); // number button gray
-  final Color _opBtn = Colors.orange; // orange operator buttons
-  final Color _textLight = const Color(0xFFEDEDED); // white-ish text
-  final Color _displayGreen = const Color(0xFF7CFF6B); // green display text
+  // UI COLORS (theme-like constants)
+  final Color _appBg = const Color(0xFFEFEFEF); // background behind calculator panel
+  final Color _panelBg = const Color(0xFF101319); // calculator body
+  final Color _displayBg = const Color(0xFF1A1F28); // display background pill
+  final Color _numBtn = const Color(0xFF2A2F3A); // number buttons
+  final Color _opBtn = Colors.orange; // operator buttons
+  final Color _textLight = const Color(0xFFEDEDED); // light text color on dark buttons
+  final Color _displayGreen = const Color(0xFF7CFF6B); // display text color
 
-  // ==========================
-  // CALC STATE
-  // ==========================
-  double? _firstValue; // first operand
-  String? _operator; // "+", "-", "×", "÷"
-  bool _startNewNumber = false; // if true, next digit replaces display
+  // CALCULATOR STATE
+  double? _firstValue; // first operand (ex: after user presses +)
+  String? _operator; // pending operator: "+", "−", "×", "÷"
+  bool _startNewNumber = false; // true => next digit replaces display (after operator or =)
 
-  // ==========================
-  // INPUT HANDLERS
-  // ==========================
+  // INPUT HANDLERS (digits + special input)
 
+  // User tapped a digit (0-9).
+  // Rules:
+  // 1) If user is starting a new number, replace the display with the digit.
+  // 2) Otherwise, append the digit to the current display text.
+  // 3) Replace leading "0" to avoid numbers like "0007".
   void _tapDigit(String digit) {
     setState(() {
-      // If we just pressed an operator or equals, start a new number
+      // After pressing an operator or equals, the next digit should start fresh
       if (_startNewNumber) {
         displayText = digit;
         _startNewNumber = false;
         return;
       }
 
-      // Normal typing behavior
+      // Normal typing behavior (append)
       if (displayText == "0") {
         displayText = digit;
       } else {
@@ -67,6 +71,10 @@ class _CalculatorUIState extends State<CalculatorUI> {
     });
   }
 
+  // User tapped the decimal point.
+  // Rules:
+  // - If user is starting a new number, begin with "0."
+  // - No more than one decimal in the same number.
   void _tapDecimal() {
     setState(() {
       if (_startNewNumber) {
@@ -74,12 +82,17 @@ class _CalculatorUIState extends State<CalculatorUI> {
         _startNewNumber = false;
         return;
       }
+
       if (!displayText.contains(".")) {
         displayText += ".";
       }
     });
   }
 
+  // Clear/All-clear:
+  // - resets display
+  // - clears stored operand and operator
+  // - returns calculator to initial state
   void _clear() {
     setState(() {
       displayText = "0";
@@ -89,9 +102,14 @@ class _CalculatorUIState extends State<CalculatorUI> {
     });
   }
 
+  // Toggle sign:
+  // - "45"  -> "-45"
+  // - "-45" -> "45"
+  // Edge case: if display is "0", do nothing.
   void _toggleSign() {
     setState(() {
       if (displayText == "0") return;
+
       if (displayText.startsWith("-")) {
         displayText = displayText.substring(1);
         if (displayText.isEmpty) displayText = "0";
@@ -101,10 +119,13 @@ class _CalculatorUIState extends State<CalculatorUI> {
     });
   }
 
+  // Percent:
+  // Converts current number to a percent by dividing by 100.
+  // Example: "50" -> "0.5"
   void _percent() {
     setState(() {
       final value = double.tryParse(displayText);
-      if (value == null) return;
+      if (value == null) return; // if display is "Error" or invalid
       final result = value / 100.0;
       displayText = _formatNumber(result);
     });
@@ -112,34 +133,53 @@ class _CalculatorUIState extends State<CalculatorUI> {
 
   // OPERATOR + EQUALS LOGIC
 
-  /// User tapped +, −, ×, ÷
+  // User tapped an operator (+, −, ×, ÷).
+  // Behavior:
+  // - Store the current display as the first operand.
+  // - Store the operator.
+  // - Set _startNewNumber so the next digit begins the second operand.
+  // Also supports chaining:
+  //   2 + 3 + 4
+  // When user hits the second operator, intermediate result is computed first.
   void _tapOperator(String op) {
     setState(() {
       final current = double.tryParse(displayText);
       if (current == null) {
-        // if display is "Error" etc, do nothing
+        // If display is "Error" or invalid text, ignore operator press
         return;
       }
 
-      // If we already have a pending operation and user presses another operator,
-      // compute intermediate result first (supports chaining like 2 + 3 + 4).
+      // If there is already a pending operation and the user is NOT just starting a new number,
+      // compute intermediate result (supports chaining like 2 + 3 + 4).
       if (_firstValue != null && _operator != null && !_startNewNumber) {
         final computed = _compute(_firstValue!, _operator!, current);
         if (computed == null) return; // error handled inside _compute
+
+        // Save intermediate result as the new first value
         _firstValue = computed;
+
+        // Show intermediate result in the display
         displayText = _formatNumber(computed);
       } else {
+        // Normal case: store current number as first operand
         _firstValue = current;
       }
 
+      // Store operator and prepare for next number input
       _operator = op;
-      _startNewNumber = true; // next digit starts fresh
+      _startNewNumber = true;
     });
   }
 
-  /// User tapped =
+  // User tapped "=".
+  // Requirements:
+  // - Must have a stored first value and operator
+  // - Current display becomes the second operand
+  // - Compute result and show it in displayText
+  // - Reset stored operator/first value so user can continue from result
   void _equals() {
     setState(() {
+      // If user presses "=" without a complete expression, do nothing safely
       if (_firstValue == null || _operator == null) return;
 
       final second = double.tryParse(displayText);
@@ -148,29 +188,37 @@ class _CalculatorUIState extends State<CalculatorUI> {
       final computed = _compute(_firstValue!, _operator!, second);
       if (computed == null) return; // error handled inside _compute
 
+      // Show final result
       displayText = _formatNumber(computed);
 
-      // Reset operation state so user can continue from result
+      // Reset stored operation so user can start a new operation from the result
       _firstValue = null;
       _operator = null;
-      _startNewNumber = true;
+      _startNewNumber = true; // next digit replaces result
     });
   }
 
-  // Performs math. Returns null if error (like divide by zero).
+  // Perform the math operation.
+  // Returns null when an error occurs (ex: divide by zero).
   double? _compute(double a, String op, double b) {
     double result;
+
     switch (op) {
       case "+":
         result = a + b;
         break;
+
       case "−":
         result = a - b;
         break;
+
       case "×":
         result = a * b;
         break;
+
       case "÷":
+        // Division by zero protection:
+        // show "Error", reset state, and stop.
         if (b == 0) {
           displayText = "Error";
           _firstValue = null;
@@ -180,32 +228,40 @@ class _CalculatorUIState extends State<CalculatorUI> {
         }
         result = a / b;
         break;
+
       default:
         return null;
     }
+
     return result;
   }
 
-  /// Formats doubles nicely:
-  ///  5.0 -> "5"
-  ///  2.5000 -> "2.5"
+  // Formats doubles for cleaner display:
+  // - 5.0 -> "5"
+  // - 2.5000 -> "2.5"
+  // - Prevents weird trailing zeros in the display.
   String _formatNumber(double value) {
     String s = value.toString();
+
     if (s.contains(".")) {
-      // trim trailing zeros
+      // Remove trailing zeros and an optional trailing decimal point
+      // Example: "10.000" -> "10", "2.5000" -> "2.5"
       s = s.replaceFirst(RegExp(r'\.?0+$'), '');
     }
+
     return s.isEmpty ? "0" : s;
   }
 
   // REUSABLE BUTTON BUILDER
 
+  // Builds a calculator button with consistent style.
+  // I use Expanded so every row's buttons share the available space.
   Widget _calcButton({
     required String label,
     required Color background,
     required Color foreground,
     VoidCallback? onPressed,
-    int flex = 1, // makes "0" wider when flex=2
+    int flex = 1, // flex=2 makes the "0" button twice as wide
   }) {
     return Expanded(
       flex: flex,
@@ -214,11 +270,12 @@ class _CalculatorUIState extends State<CalculatorUI> {
         child: SizedBox(
           height: 70,
           child: ElevatedButton(
+            // If no callback is supplied, it does nothing (safe default)
             onPressed: onPressed ?? () {},
             style: ElevatedButton.styleFrom(
               backgroundColor: background,
               foregroundColor: foreground,
-              elevation: 0, // flat modern look like the screenshot
+              elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             ),
             child: Text(label, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
@@ -228,7 +285,7 @@ class _CalculatorUIState extends State<CalculatorUI> {
     );
   }
 
-  /// Helper to build each row (4-column rows, except last row).
+  // helper to build one row of buttons.
   Widget _row(List<Widget> children) {
     return Row(children: children);
   }
@@ -238,7 +295,7 @@ class _CalculatorUIState extends State<CalculatorUI> {
     return Scaffold(
       backgroundColor: _appBg,
 
-      // Center the calculator "device" on the page like the picture
+      // Center the calculator "device" on the page
       body: Center(
         child: Container(
           width: 360,
@@ -247,9 +304,9 @@ class _CalculatorUIState extends State<CalculatorUI> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ======================
+
               // DISPLAY AREA (Top)
-              // ======================
+
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
@@ -258,6 +315,7 @@ class _CalculatorUIState extends State<CalculatorUI> {
                   alignment: Alignment.centerRight,
                   child: Text(
                     displayText,
+                    // Prevent layout overflow for long results (ex: many digits)
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: _displayGreen, letterSpacing: 1.0),
@@ -267,7 +325,9 @@ class _CalculatorUIState extends State<CalculatorUI> {
 
               const SizedBox(height: 16),
 
-              // Row 1
+              // BUTTON GRID
+
+              // Row 1: Clear, sign, percent, divide
               _row([
                 _calcButton(label: "C", background: _opBtn, foreground: _textLight, onPressed: _clear),
                 _calcButton(label: "±", background: _opBtn, foreground: _textLight, onPressed: _toggleSign),
@@ -275,7 +335,7 @@ class _CalculatorUIState extends State<CalculatorUI> {
                 _calcButton(label: "÷", background: _opBtn, foreground: _textLight, onPressed: () => _tapOperator("÷")),
               ]),
 
-              // Row 2
+              // Row 2: 7 8 9 multiply
               _row([
                 _calcButton(label: "7", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("7")),
                 _calcButton(label: "8", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("8")),
@@ -283,7 +343,7 @@ class _CalculatorUIState extends State<CalculatorUI> {
                 _calcButton(label: "×", background: _opBtn, foreground: _textLight, onPressed: () => _tapOperator("×")),
               ]),
 
-              // Row 3
+              // Row 3: 4 5 6 subtract
               _row([
                 _calcButton(label: "4", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("4")),
                 _calcButton(label: "5", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("5")),
@@ -291,7 +351,7 @@ class _CalculatorUIState extends State<CalculatorUI> {
                 _calcButton(label: "−", background: _opBtn, foreground: _textLight, onPressed: () => _tapOperator("−")),
               ]),
 
-              // Row 4
+              // Row 4: 1 2 3 add
               _row([
                 _calcButton(label: "1", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("1")),
                 _calcButton(label: "2", background: _numBtn, foreground: _textLight, onPressed: () => _tapDigit("2")),
@@ -299,7 +359,7 @@ class _CalculatorUIState extends State<CalculatorUI> {
                 _calcButton(label: "+", background: _opBtn, foreground: _textLight, onPressed: () => _tapOperator("+")),
               ]),
 
-              // Row 5 (0 is wide)
+              // Row 5: wide 0, decimal, equals
               _row([
                 _calcButton(label: "0", background: _numBtn, foreground: _textLight, flex: 2, onPressed: () => _tapDigit("0")),
                 _calcButton(label: ".", background: _numBtn, foreground: _textLight, onPressed: _tapDecimal),
